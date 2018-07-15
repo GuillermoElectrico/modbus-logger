@@ -75,7 +75,8 @@ class DataCollector:
                     while retries > 0:
                         try:
                             retries -= 1
-                            datas[device['id']][parameter] = master.execute(device['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter], 2)
+                            datas[device['id']][parameter] = master.execute(device['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1])
+                            #datas[device['id']][parameter] = master.execute(device['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter], 2)
                             retries = 0
                             pass
                         except ValueError as ve:

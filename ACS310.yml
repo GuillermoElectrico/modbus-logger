@@ -1,8 +1,23 @@
-PAR BCI 10 : 40005
-PAR BCI 11 : 40006
-PAR BCI 12 : 40007
-PAR BCI 13 : 40008
-PAR BCI 14 : 40009
-PAR BCI 15 : 40010
-PAR BCI 16 : 40011
-PAR BCI 17 : 40012
+PAR BCI 10 :
+ - 40005	# Adress dec data
+ - 2		# Length word
+PAR BCI 11 :
+ - 40006
+ -2
+PAR BCI 12 :
+ - 40007
+ - 2
+PAR BCI 13 :
+ - 40008
+PAR BCI 14 :
+ - 40009
+ - 2
+PAR BCI 15 : 
+ - 40010
+ - 2
+PAR BCI 16 :
+ - 40011
+ - 2
+PAR BCI 17 :
+ - 40012
+ - 2
