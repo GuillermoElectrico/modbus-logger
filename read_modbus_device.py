@@ -9,9 +9,7 @@ import serial
 import time
 import yaml
 import logging
-import modbus_tk
-import modbus_tk.defines as cst
-from modbus_tk import modbus_rtu
+import minimalmodbus
 
 #PORT = 1
 PORT = '/dev/ttyUSB0'
@@ -49,62 +47,73 @@ class DataCollector:
         t_utc = datetime.utcnow()
         t_str = t_utc.isoformat() + 'Z'
 
+        instrument = minimalmodbus.Instrument('/dev/ttyUSB0', 1) # port name, slave address (in decimal)
+        instrument.mode = minimalmodbus.MODE_RTU   # rtu or ascii mode
         datas = dict()
         device_id_name = dict() # mapping id to name
 
         for device in devices:
             device_id_name[device['id']] = device['name']
-			
-            try:
-                master = modbus_rtu.RtuMaster(
-                    serial.Serial(port=PORT, baudrate=device['baudrate'], bytesize=device['bytesize'], parity=device['parity'], stopbits=device['stopbits'], xonxoff=0)
-                )
-					
-                master.set_timeout(device['timeout'])
-                master.set_verbose(True)
 
-                log.debug('Reading device %s.' % (device['id']))
-                start_time = time.time()
-                parameters = yaml.load(open(device['type']))
-                datas[device['id']] = dict()
+            instrument.serial.baudrate = device['baudrate']
+            instrument.serial.bytesize = device['bytesize']
+            instrument.serial.bytesize = device['bytesize']
+            if device['parity'] == 'none':
+                instrument.serial.parity = minimalmodbus.serial.PARITY_NONE
+            elif device['parity'] == 'odd':
+                instrument.serial.parity = minimalmodbus.serial.PARITY_ODD
+            elif device['parity'] == 'even':
+                instrument.serial.parity = minimalmodbus.serial.PARITY_EVEN
+            else:
+                log.error('No parity specified')
+                raise
+            instrument.serial.stopbits = device['stopbits']
+            instrument.serial.timeout  = device['timeout']    # seconds
+            instrument.address = device['id']    # this is the slave address number
 
-                for parameter in parameters:
-                    # If random readout errors occour, e.g. CRC check fail, test to uncomment the following row
-                    #time.sleep(0.01) # Sleep for 10 ms between each parameter read to avoid errors
-                    retries = 10
-                    while retries > 0:
-                        try:
-                            retries -= 1
-                            datas[device['id']][parameter] = master.execute(device['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1])
-                            #datas[device['id']][parameter] = master.execute(device['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter], 2)
-                            retries = 0
-                            pass
-                        except ValueError as ve:
-                            log.warning('Value Error while reading register {} from device {}. Retries left {}.'
-                                   .format(parameters[parameter], device['id'], retries))
-                            log.error(ve)
-                            if retries == 0:
-                                raise RuntimeError
-                        except TypeError as te:
-                            log.warning('Type Error while reading register {} from device {}. Retries left {}.'
-                                   .format(parameters[parameter], device['id'], retries))
-                            log.error(te)
-                            if retries == 0:
-                                raise RuntimeError
-                        except IOError as ie:
-                            log.warning('IO Error while reading register {} from device {}. Retries left {}.'
-                                   .format(parameters[parameter], device['id'], retries))
-                            log.error(ie)
-                            if retries == 0:
-                                raise RuntimeError
-                        except:
-                            log.error("Unexpected error:", sys.exc_info()[0])
-                            raise
+            log.debug('Reading device %s.' % (device['id']))
+            start_time = time.time()
+            parameters = yaml.load(open(device['type']))
+            datas[device['id']] = dict()
 
-                datas[device['id']]['Read time'] =  time.time() - start_time
-			
-            except modbus_tk.modbus.ModbusError as exc:
-                log.error("%s- Code=%d", exc, exc.get_exception_code())
+            for parameter in parameters:
+                # If random readout errors occour, e.g. CRC check fail, test to uncomment the following row
+                #time.sleep(0.01) # Sleep for 10 ms between each parameter read to avoid errors
+                retries = 10
+                while retries > 0:
+                    try:
+                        retries -= 1
+                        if parameters[parameter][2] == 1:
+                            datas[device['id']][parameter] = instrument.read_float(parameters[parameter][0], device['function'], parameters[parameter][1])
+                        elif parameters[parameter][2] == 2:
+                            datas[device['id']][parameter] = instrument.read_long(parameters[parameter][0], device['function'], parameters[parameter][1])
+                        elif parameters[parameter][2] == 3:
+                            datas[device['id']][parameter] = instrument.read_register(parameters[parameter][0], device['function'], parameters[parameter][1])
+                        retries = 0
+                        pass
+                    except ValueError as ve:
+                        log.warning('Value Error while reading register {} from device {}. Retries left {}.'
+                               .format(parameters[parameter], device['id'], retries))
+                        log.error(ve)
+                        if retries == 0:
+                            raise RuntimeError
+                    except TypeError as te:
+                        log.warning('Type Error while reading register {} from device {}. Retries left {}.'
+                               .format(parameters[parameter], device['id'], retries))
+                        log.error(te)
+                        if retries == 0:
+                            raise RuntimeError
+                    except IOError as ie:
+                        log.warning('IO Error while reading register {} from device {}. Retries left {}.'
+                               .format(parameters[parameter], device['id'], retries))
+                        log.error(ie)
+                        if retries == 0:
+                            raise RuntimeError
+                    except:
+                        log.error("Unexpected error:", sys.exc_info()[0])
+                        raise
+
+            datas[device['id']]['ReadTime'] =  time.time() - start_time			
 
         json_body = [
             {

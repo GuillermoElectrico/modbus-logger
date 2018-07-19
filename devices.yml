@@ -4,14 +4,16 @@ meters:
       id : 1     # this is the slave address number
       baudrate : 9600   # Baud
       bytesize : 8
-      parity : 'E' # 'N' = none | 'E' = even | 'O' = odd | 'S' = space| 'M' = mark
+      parity : none # none | odd | even
       stopbits : 1
       timeout  : 0.5   # seconds
+      function : 3    # 3 = Read Input register or 4 = Read Holding register
     - name : Device Group 2
       type : ACS310.yml
       id : 10     # this is the slave address number
       baudrate : 9600   # Baud
       bytesize : 8
-      parity : 'N' # 'N' = none | 'E' = even | 'O' = odd | 'S' = space| 'M' = mark
+      parity : none # none | odd | even
       stopbits : 1
       timeout  : 0.5   # seconds
+      function : 3    # 3 = Read Input register or 4 = Read Holding register
