@@ -117,7 +117,7 @@ class DataCollector:
 
         json_body = [
             {
-                'measurement': 'energy',
+                'measurement': 'modbusLog',
                 'tags': {
                     'id': device_id,
                     'device': device['name'],
