@@ -1,20 +1,10 @@
 import sys
 from setuptools import setup
 
-try:
-    import pypandoc
-    readme = pypandoc.convert('README.md', 'rst')
-    readme = readme.replace("\r", "")
-except ImportError:
-    import io
-    with io.open('README.md', encoding="utf-8") as f:
-        readme = f.read()
-
 setup(name='modbus_logger',
       version=1.1,
       description='Read data using RS485 Modbus '+
       'and store in local database.',
-      long_description=readme,
       url='https://github.com/GuillermoElectrico/modbus-logger',
       download_url='',
       author='Samuel Vestlin',
