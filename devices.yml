@@ -1,4 +1,4 @@
-meters:
+devices:
     - name : Device Group 1
       type : ACQ810.yml
       id : 1     # this is the slave address number
