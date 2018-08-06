@@ -7,7 +7,7 @@ devices:
       parity : none # none | odd | even
       stopbits : 1
       timeout  : 0.5   # seconds
-      function : 3    # 3 = Read Input register or 4 = Read Holding register
+      function : 3    # 3 = Read Holding register or 4 = Read Input register 
     - name : Device Group 2
       type : ACS310.yml
       id : 10     # this is the slave address number
@@ -16,4 +16,4 @@ devices:
       parity : none # none | odd | even
       stopbits : 1
       timeout  : 0.5   # seconds
-      function : 3    # 3 = Read Input register or 4 = Read Holding register
+      function : 3    # 3 = Read Holding register or 4 = Read Input register 
