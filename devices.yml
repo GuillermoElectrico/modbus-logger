@@ -4,7 +4,7 @@ devices:
       id : 1     # this is the slave address number
       baudrate : 9600   # Baud
       bytesize : 8
-      parity : 'E' # 'N' = none | 'E' = even | 'O' = odd | 'S' = space| 'M' = mark
+      parity : 'N' # 'N' = none | 'E' = even | 'O' = odd | 'S' = space| 'M' = mark
       stopbits : 1
       timeout  : 0.5   # seconds
       function : 3    # 3 = Read Holding register or 4 = Read Input register 

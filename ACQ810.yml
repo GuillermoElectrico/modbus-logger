@@ -1,96 +1,96 @@
 E/S datos 1:
  - 4 # Adress dec data
- - 2 # Length word
- - 1 # Data Type. 1=Float, 2=Long, 3=Integer
+ - 1 # Length word
+ - 3 # Data Type. 1=Float, 2=Long, 3=Integer
 E/S datos 2:
  - 5
- - 2
  - 1
+ - 3
 E/S datos 3:
  - 6
- - 2
  - 1
+ - 3
 E/S datos 4:
  - 7
- - 2
  - 1
+ - 3
 E/S datos 5:
  - 8
- - 2
  - 1
+ - 3
 E/S datos 6:
  - 9
- - 2
  - 1
+ - 3
 E/S datos 7:
  - 10
- - 2
  - 1
+ - 3
 E/S datos 8:
  - 11
- - 2
  - 1
+ - 3
 E/S datos 9:
  - 12
- - 2
  - 1
+ - 3
 E/S datos 10:
  - 13
- - 2
  - 1
+ - 3
 E/S datos 11:
  - 14
- - 2
  - 1
+ - 3
 E/S datos 12:
  - 15
- - 2
  - 1
+ - 3
 E/S datos 13:
  - 54
- - 2
  - 1
+ - 3
 E/S datos 14:
  - 55
- - 2
  - 1
+ - 3
 E/S datos 15:
  - 56
- - 2
  - 1
+ - 3
 E/S datos 16:
  - 57
- - 2
  - 1
+ - 3
 E/S datos 17:
  - 58
- - 2
  - 1
+ - 3
 E/S datos 18:
  - 59
- - 2
  - 1
+ - 3
 E/S datos 19:
  - 60
- - 2
  - 1
+ - 3
 E/S datos 20:
  - 61
- - 2
  - 1
+ - 3
 E/S datos 21:
  - 62
- - 2
  - 1
+ - 3
 E/S datos 22:
  - 63
- - 2
  - 1
+ - 3
 E/S datos 23:
  - 64
- - 2
  - 1
+ - 3
 E/S datos 24:
  - 65
- - 2
  - 1
+ - 3
