@@ -1,6 +1,6 @@
 # Modbus-Logger
 Log your modbus-rtu device data on a Raspberry Pi/Orange Pi and plot graphs of your data.
-Its been verified to work with a Raspberry Pi with a Linksprite RS485 shield and USB to RS485 adapter for reading values from ABB ACS310 anda ABB ACS810. By changing the devices.yml file and making a corresponding [model].yml file it should be possible to use other modbus enabled models.
+Its been verified to work with a Raspberry Pi with a Linksprite RS485 shield and Orange Pi Zero with USB to RS485 adapter for reading values from ABB ACS310 anda ABB ACS810. By changing the devices.yml file and making a corresponding [model].yml file it should be possible to use other modbus enabled models.
 
 ### Requirements
 
@@ -74,7 +74,7 @@ Its been verified to work with a Raspberry Pi with a Linksprite RS485 shield and
 * Go to http://localhost:3000 and login using admin / admin (remember to change password)
 [*source](http://docs.grafana.org/installation/debian/)
 
-#### Install Energy Meter Logger:
+#### Install Modbus Logger:
 * Download and install from Github and install pip3
     ```sh
     $ git clone https://github.com/GuillermoElectrico/modbus-logger.git
