@@ -89,7 +89,7 @@ Its been verified to work with a Raspberry Pi with a Linksprite RS485 shield and
     ```sh
     $ chmod 777 read_modbus_device.py
     ```
-* Edit meters.yml to match your configuration
+* Edit devices.yml to match your configuration
 * Test the configuration by running:
     ```sh
     ./read_modbus_device.py
