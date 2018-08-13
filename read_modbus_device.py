@@ -81,14 +81,14 @@ class DataCollector:
                                 elif parameters[parameter][2] == 2:
                                     resultado = master.execute(device['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>l')
                                 elif parameters[parameter][2] == 3:
-                                    resultado = master.execute(device['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>i')
+                                    resultado = master.execute(device['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1])
                             elif device['function'] == 4:
                                 if parameters[parameter][2] == 1:
                                     resultado = master.execute(device['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>f')
                                 elif parameters[parameter][2] == 2:
                                     resultado = master.execute(device['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>l')
                                 elif parameters[parameter][2] == 3:
-                                    resultado = master.execute(device['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>i')
+                                    resultado = master.execute(device['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1])
                             datas[device['id']][parameter] = resultado[0]
                             retries = 0
                             pass
