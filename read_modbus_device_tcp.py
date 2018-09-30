@@ -58,12 +58,12 @@ class DataCollector:
 			
             try:
                 if device['conexion'] == R:
-                    master = modbus_rtu.RtuMaster(
+                    masterRTU = modbus_rtu.RtuMaster(
                         serial.Serial(port=PORT, baudrate=device['baudrate'], bytesize=device['bytesize'], parity=device['parity'], stopbits=device['stopbits'], xonxoff=0)
                     )
 					
-                    master.set_timeout(device['timeout'])
-                    master.set_verbose(True)
+                    masterRTU.set_timeout(device['timeout'])
+                    masterRTU.set_verbose(True)
 
                     log.debug('Reading device %s.' % (device['id']))
                     start_time = time.time()
@@ -79,18 +79,18 @@ class DataCollector:
                                 retries -= 1
                                 if device['function'] == 3:
                                     if parameters[parameter][2] == 1:
-                                        resultado = master.execute(device['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>f')
+                                        resultado = masterRTU.execute(device['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>f')
                                     elif parameters[parameter][2] == 2:
-                                        resultado = master.execute(device['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>l')
+                                        resultado = masterRTU.execute(device['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>l')
                                     elif parameters[parameter][2] == 3:
-                                        resultado = master.execute(device['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1])
+                                        resultado = masterRTU.execute(device['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1])
                                 elif device['function'] == 4:
                                     if parameters[parameter][2] == 1:
-                                        resultado = master.execute(device['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>f')
+                                        resultado = masterRTU.execute(device['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>f')
                                     elif parameters[parameter][2] == 2:
-                                        resultado = master.execute(device['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>l')
+                                        resultado = masterRTU.execute(device['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>l')
                                     elif parameters[parameter][2] == 3:
-                                        resultado = master.execute(device['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1])
+                                        resultado = masterRTU.execute(device['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1])
                                 datas[device['id']][parameter] = resultado[0]
                                 retries = 0
                                 pass
@@ -118,9 +118,9 @@ class DataCollector:
 
                     datas[device['id']]['ReadTime'] =  time.time() - start_time
 			    elif device['conexion'] == T:
-                    master = modbus_tcp.TcpMaster(device['direction'],device['port'])
+                    masterTCP = modbus_tcp.TcpMaster(device['direction'],device['port'])
 					
-                    master.set_timeout(device['timeout'])
+                    masterTCP.set_timeout(device['timeout'])
 
                     log.debug('Reading device %s.' % (device['id']))
                     start_time = time.time()
@@ -136,18 +136,18 @@ class DataCollector:
                                 retries -= 1
                                 if device['function'] == 3:
                                     if parameters[parameter][2] == 1:
-                                        resultado = master.execute(device['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>f')
+                                        resultado = masterTCP.execute(device['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>f')
                                     elif parameters[parameter][2] == 2:
-                                        resultado = master.execute(device['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>l')
+                                        resultado = masterTCP.execute(device['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>l')
                                     elif parameters[parameter][2] == 3:
-                                        resultado = master.execute(device['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1])
+                                        resultado = masterTCP.execute(device['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1])
                                 elif device['function'] == 4:
                                     if parameters[parameter][2] == 1:
-                                        resultado = master.execute(device['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>f')
+                                        resultado = masterTCP.execute(device['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>f')
                                     elif parameters[parameter][2] == 2:
-                                        resultado = master.execute(device['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>l')
+                                        resultado = masterTCP.execute(device['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>l')
                                     elif parameters[parameter][2] == 3:
-                                        resultado = master.execute(device['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1])
+                                        resultado = masterTCP.execute(device['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1])
                                 datas[device['id']][parameter] = resultado[0]
                                 retries = 0
                                 pass
