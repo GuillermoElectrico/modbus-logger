@@ -4,9 +4,9 @@
 //----------------------------------------------------------------------------------------------------
 
 #define MB_PORT 502
-#define SLAVEID 1
+#define SLAVEID 1          // id device rs485 connected.
 #define BAUDRATE 9600      //rate de baud a comunicate RS485
-#define RS485_ENABLE_PIN 0 //pinul GPIO0
+#define RS485_ENABLE_PIN 0 //pinul GPIO0 or gpio2
 
 //#define MB_ETHERNET
 #define MB_ESP8266
