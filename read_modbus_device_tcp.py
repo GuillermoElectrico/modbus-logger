@@ -57,7 +57,7 @@ class DataCollector:
             device_id_name[device['id']] = device['name']
 			
             try:
-                if device['conexion'] == R:
+                if device['conexion'] == 'R':
                     masterRTU = modbus_rtu.RtuMaster(
                         serial.Serial(port=PORT, baudrate=device['baudrate'], bytesize=device['bytesize'], parity=device['parity'], stopbits=device['stopbits'], xonxoff=0)
                     )
@@ -117,7 +117,7 @@ class DataCollector:
                                 raise
 
                     datas[device['id']]['ReadTime'] =  time.time() - start_time
-			    elif device['conexion'] == T:
+                elif device['conexion'] == 'T':
                     masterTCP = modbus_tcp.TcpMaster(device['direction'],device['port'])
 					
                     masterTCP.set_timeout(device['timeout'])
