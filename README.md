@@ -2,7 +2,7 @@
 Log your modbus-rtu device data on a Raspberry Pi/Orange Pi and plot graphs of your data.
 Its been verified to work with a Raspberry Pi with a Linksprite RS485 shield and Orange Pi Zero with USB to RS485 adapter for reading values from ABB ACS310 anda ABB ACS810. By changing the devices.yml file and making a corresponding [model].yml file it should be possible to use other modbus enabled models.
 
-Add support for ModbusTCP and add bridge RTU to TCP vía ESP8266
+Add support for ModbusTCP and add bridge RTU to TCP vía ESP8266 and multi Influx_DB databases
 
 ### Requirements
 
