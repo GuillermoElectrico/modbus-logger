@@ -22,7 +22,12 @@ os.chdir(sys.path[0])
 
 class DataCollector:
     def __init__(self, influx_client, device_yaml):
-        self.influx_client = influx_client
+        self.influx_yaml = influx_yaml
+        self.influx_map = None
+        self.influx_map_last_change = -1
+        log.info('InfluxDB:')
+        for influx_config in sorted(self.get_influxdb(), key=lambda x:sorted(x.keys())):
+            log.info('\t {} <--> {}'.format(influx_config['host'], influx_config['name']))
         self.device_yaml = device_yaml
         self.max_iterations = None  # run indefinitely by default
         self.device_map = None
@@ -43,10 +48,24 @@ class DataCollector:
                 log.warning('Failed to re-load device map, going on with the old one.')
                 log.warning(e)
         return self.device_map
+		
+    def get_influxdb(self):
+        assert path.exists(self.influx_yaml), 'InfluxDB map not found: %s' % self.influx_yaml
+        if path.getmtime(self.influx_yaml) != self.influx_map_last_change:
+            try:
+                log.info('Reloading influxDB map as file changed')
+                new_map = yaml.load(open(self.influx_yaml))
+                self.influx_map = new_map['influxdb']
+                self.influx_map_last_change = path.getmtime(self.influx_yaml)
+            except Exception as e:
+                log.warning('Failed to re-load influxDB map, going on with the old one.')
+                log.warning(e)
+        return self.influx_map
 
     def collect_and_store(self):
         #instrument.debug = True
         devices = self.get_devices()
+        influxdb = self.get_influxdb()
         t_utc = datetime.utcnow()
         t_str = t_utc.isoformat() + 'Z'
 
@@ -191,13 +210,23 @@ class DataCollector:
             for device_id in datas
         ]
         if len(json_body) > 0:
-            try:
-                self.influx_client.write_points(json_body)
-                log.info(t_str + ' Data written for %d devices.' % len(json_body))
-            except Exception as e:
-                log.error('Data not written!')
-                log.error(e)
-                raise
+            influx_id_name = dict() # mapping host to name
+			
+            for influx_config in influxdb:
+                influx_id_name[influx_config['host']] = influx_config['name']
+				
+                DBclient = InfluxDBClient(influx_config['host'],
+                                        influx_config['port'],
+                                        influx_config['user'],
+                                        influx_config['password'],
+                                        influx_config['dbname'])
+                try:
+                    DBclient.write_points(json_body)
+                    log.info(t_str + ' Data written for %d devices in {}.' .format(influx_config['name']) % len(json_body) )
+                except Exception as e:
+                    log.error('Data not written! in {}' .format(influx_config['name']))
+                    log.error(e)
+                    raise
         else:
             log.warning(t_str, 'No data sent.')
 
@@ -228,6 +257,8 @@ if __name__ == '__main__':
                         help='Device readout interval (seconds), default 60')
     parser.add_argument('--devices', default='devices.yml',
                         help='YAML file containing Device ID, name, type etc. Default "devices.yml"')
+    parser.add_argument('--influxdb', default='influx_config.yml',
+                        help='YAML file containing Influx Host, port, user etc. Default "influx_config.yml"')
     parser.add_argument('--log', default='CRITICAL',
                         help='Log levels, DEBUG, INFO, WARNING, ERROR or CRITICAL')
     parser.add_argument('--logfile', default='',
@@ -253,14 +284,14 @@ if __name__ == '__main__':
     log.info('Started app')
 
     # Create the InfluxDB object
-    influx_config = yaml.load(open('influx_config.yml'))
-    client = InfluxDBClient(influx_config['host'],
-                            influx_config['port'],
-                            influx_config['user'],
-                            influx_config['password'],
-                            influx_config['dbname'])
+#    influx_config = yaml.load(open('influx_config.yml'))
+#    client = InfluxDBClient(influx_config['host'],
+#                            influx_config['port'],
+#                            influx_config['user'],
+#                            influx_config['password'],
+#                            influx_config['dbname'])
 
-    collector = DataCollector(influx_client=client,
+    collector = DataCollector(influx_yaml=args.influxdb,
                               device_yaml=args.devices)
 
     repeat(interval,
