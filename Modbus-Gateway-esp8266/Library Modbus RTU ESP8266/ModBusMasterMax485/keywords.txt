@@ -1,5 +1,6 @@
-ModbusMaster232	KEYWORD1
-node	KEYWORD3
+ModBusMasterMax485	KEYWORD1
+node	KEYWORD2
+slaveID	KEYWORD2
 
 
 getResponseBuffer	KEYWORD2

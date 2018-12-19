@@ -31,12 +31,18 @@ Arduino library for communicating with Modbus slaves over RS232/485 (via RTU pro
   Written by Doc Walker (Rx)
   Copyright © 2009-2013 Doc Walker <4-20ma at wvfans dot net>
   
+    Modificado para esp8266
+  - Function crc16
+  - Function makeWord
+  - Function half duplex RS485_ENABLE_PIN 
+  - Function to auto update slaveID (232 to 485) 
+  
 */
 
 
   
-#ifndef	_MODBUSMASTER232_H_INCLUDED
-#define	_MODBUSMASTER232_H_INCLUDED
+#ifndef	_MODBUSMASTERMAX485_H_INCLUDED
+#define	_MODBUSMASTERMAX485_H_INCLUDED
 
 
 /**
@@ -100,17 +106,18 @@ Macro to generate 32-bit integer from (2) 16-bit words.
 Arduino class library for communicating with Modbus slaves over 
 RS232/485 (via RTU protocol).
 */
-class ModbusMaster232
+class ModBusMasterMax485
 {
   public:
   
-    ModbusMaster232();
-    ModbusMaster232(uint8_t);
-    ModbusMaster232(uint8_t, uint8_t);
+    ModBusMasterMax485();
+    ModBusMasterMax485(uint8_t);
+ //   ModBusMasterMax485(uint8_t, uint8_t);
     
     void begin();
     void begin(unsigned long);
     void idle(void (*)());
+	void slaveID(uint8_t);
     
     // Modbus exception codes
     /**

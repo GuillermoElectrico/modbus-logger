@@ -1,25 +1,40 @@
 // Include these libraries for using the RS-232 to RS-485 adaptor and Modbus functions
-#include <ModbusMaster232.h>
+#include <ModBusMasterMax485.h>
 
-//----------------------------------------------------------------------------------------------------
+//---------------------------------- ONLY CONFIG THIS ----------------------------------------------------
 
 #define MB_PORT 502
-#define SLAVEID 1          // id device rs485 connected.
 #define BAUDRATE 9600      //rate de baud a comunicate RS485
-#define RS485_ENABLE_PIN 0 //pinul GPIO0 or gpio2
+#define RS485_ENABLE_PIN 0 //pinul GPIO0 or GPIO2 (GPIO0 use in PCB Git), if use arduino with ethernet shield any unused pin
 
-//#define MB_ETHERNET
+// Select board (possibility to use ethernet)
+//#define MB_ETHERNET  // Only with W5100 and library versión 1.1.2
 #define MB_ESP8266
 
-//#define STATIC_MODE  // static IP address config
+// ArduinoOTA Enabled (only with ESP8266 board)
+#define OTA
+
+// Update these with values suitable for your network.
+#define STATIC_MODE  // static IP address config (DHCP or static DHCP lease if comment this line)
 #ifdef STATIC_MODE
 byte ip[]      = { 192, 168, 0, 22 };
-byte gateway[] = { 192, 168, 0, 1 };
 byte subnet[]  = { 255, 255, 255, 0 };
+byte gateway[] = { 192, 168, 0, 1 };
 #endif
 
-#define W_SSID "Telecom-28778737"
-#define W_PASSWORD "passwordwificasa47893000"
+#ifdef MB_ESP8266
+// Wifi Settings
+const char* ssid = "......";
+const char* password = "......";
+
+#ifdef OTA
+// OTA config
+long Port = 8266; // Port defaults to 8266
+const char* Hostname = "BridgeTCP/RTU";
+const char* Password = "admin";
+
+#endif
+#endif
 
 //----------------------------------------------------------------------------------------------------
 
@@ -30,6 +45,11 @@ byte subnet[]  = { 255, 255, 255, 0 };
 #ifdef MB_ESP8266
 #define LED_PIN 5
 #include <ESP8266WiFi.h>
+#ifdef OTA
+#include <ESP8266mDNS.h>
+#include <WiFiUdp.h>
+#include <ArduinoOTA.h>
+#endif
 #endif
 
 //
@@ -71,8 +91,8 @@ EthernetServer MBServer(MB_PORT);
 WiFiServer MBServer(MB_PORT);
 #endif
 
-// Instantiate ModbusMaster object as slave ID and set GPIO to RS485_ENABLE_PIN half duplex adaptor.
-ModbusMaster232 node(SLAVEID, RS485_ENABLE_PIN);
+// Instantiate ModbusMaster object as set GPIO to RS485_ENABLE_PIN half duplex adaptor.
+ModBusMasterMax485 node(RS485_ENABLE_PIN);
 
 byte ByteArray[260];
 bool ledPinStatus = LOW;
@@ -104,13 +124,30 @@ void setup()
 #ifdef STATIC_MODE
   WiFi.config(IPAddress(ip), IPAddress(gateway), IPAddress(subnet));
 #endif
-  WiFi.begin(W_SSID, W_PASSWORD);
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
     // Blink the LED
     digitalWrite(LED_PIN, ledPinStatus); // Write LED high/low
     ledPinStatus = (ledPinStatus == HIGH) ? LOW : HIGH;
     delay(100);
   }
+#ifdef OTA
+  // Port defaults to 8266
+  ArduinoOTA.setPort(Port);
+
+  // Hostname defaults to esp8266-[ChipID]
+  ArduinoOTA.setHostname(Hostname);
+
+  // No authentication by default
+  ArduinoOTA.setPassword(Password);
+
+  // Password can be set with it's md5 value as well
+  // MD5(admin) = 21232f297a57a5a743894a0e4a801fc3
+  // ArduinoOTA.setPasswordHash("21232f297a57a5a743894a0e4a801fc3");
+
+  ArduinoOTA.begin();
+#endif
   // Start the server
   digitalWrite(LED_PIN, HIGH);
   MBServer.begin();
@@ -123,8 +160,14 @@ void setup()
 
 void loop()
 {
-  boolean flagClientConnected = 0;
+#ifdef MB_ESP8266
+#ifdef OTA
+  ArduinoOTA.handle();
+#endif
+#endif
+
   byte byteFN = MB_FC_NONE;
+  byte UID = 1;
   int Start;
   int WordDataLength;
   int ByteDataLength;
@@ -141,7 +184,6 @@ void loop()
   while (client.connected()) {
     if (client.available())
     {
-      flagClientConnected = 1;
       int i = 0;
       while (client.available())
       {
@@ -152,6 +194,7 @@ void loop()
       client.flush();
 #endif
       byteFN = ByteArray[MB_TCP_FUNC];
+      UID = ByteArray[MB_TCP_UID];
       Start = word(ByteArray[MB_TCP_REGISTER_START], ByteArray[MB_TCP_REGISTER_START + 1]);
       WordDataLength = word(ByteArray[MB_TCP_REGISTER_NUMBER], ByteArray[MB_TCP_REGISTER_NUMBER + 1]);
     }
@@ -171,6 +214,8 @@ void loop()
           ByteArray[5] = ByteDataLength + 3; //Number of bytes after this one.
           ByteArray[8] = ByteDataLength;     //Number of bytes after this one (or number of bytes of data).
 
+          node.slaveID(UID);
+
           int result = node.readCoils(Start, WordDataLength);
 
           for (int i = 0; i < WordDataLength; i++)
@@ -183,7 +228,6 @@ void loop()
 
           MessageLength = ByteDataLength + 9;
           client.write((const uint8_t *)ByteArray, MessageLength);
-          client.stop();
           node.clearResponseBuffer(); // Clear the response buffer
           byteFN = MB_FC_NONE;
         }
@@ -195,6 +239,8 @@ void loop()
           ByteDataLength = WordDataLength * 2;
           ByteArray[5] = ByteDataLength + 3; //Number of bytes after this one.
           ByteArray[8] = ByteDataLength;     //Number of bytes after this one (or number of bytes of data).
+
+          node.slaveID(UID);
 
           int result = node.readDiscreteInputs(Start, WordDataLength);
 
@@ -208,7 +254,6 @@ void loop()
 
           MessageLength = ByteDataLength + 9;
           client.write((const uint8_t *)ByteArray, MessageLength);
-          client.stop();
           node.clearResponseBuffer(); // Clear the response buffer
           byteFN = MB_FC_NONE;
         }
@@ -219,6 +264,8 @@ void loop()
           ByteDataLength = WordDataLength * 2;
           ByteArray[5] = ByteDataLength + 3; //Number of bytes after this one.
           ByteArray[8] = ByteDataLength;     //Number of bytes after this one (or number of bytes of data).
+
+          node.slaveID(UID);
 
           int result = node.readHoldingRegisters(Start, WordDataLength);
 
@@ -232,7 +279,6 @@ void loop()
 
           MessageLength = ByteDataLength + 9;
           client.write((const uint8_t *)ByteArray, MessageLength);
-          client.stop();
           node.clearResponseBuffer(); // Clear the response buffer
           byteFN = MB_FC_NONE;
         }
@@ -243,6 +289,8 @@ void loop()
           ByteDataLength = WordDataLength * 2;
           ByteArray[5] = ByteDataLength + 3; //Number of bytes after this one.
           ByteArray[8] = ByteDataLength;     //Number of bytes after this one (or number of bytes of data).
+
+          node.slaveID(UID);
 
           int result = node.readInputRegisters(Start, WordDataLength);
 
@@ -255,7 +303,6 @@ void loop()
           }
           MessageLength = ByteDataLength + 9;
           client.write((const uint8_t *)ByteArray, MessageLength);
-          client.stop();
           node.clearResponseBuffer(); // Clear the response buffer
           byteFN = MB_FC_NONE;
         }
@@ -263,11 +310,13 @@ void loop()
 
       case MB_FC_WRITE_COIL:  // 05 Write Coils
         {
+          node.slaveID(UID);
+
           int result =  node.writeSingleCoil(Start, ByteArray[MB_TCP_REGISTER_NUMBER + 1]);
           ByteArray[5] = 6; //Number of bytes after this one.
           MessageLength = 12;
           client.write((const uint8_t *)ByteArray, MessageLength);
-          client.stop();
+          //client.stop();
           node.clearTransmitBuffer(); // Clear the response buffer
           byteFN = MB_FC_NONE;
         }
@@ -275,11 +324,12 @@ void loop()
 
       case MB_FC_WRITE_REGISTER:  // 06 Write Holding Register
         {
+          node.slaveID(UID);
+
           int result =  node.writeSingleRegister(Start, word(ByteArray[MB_TCP_REGISTER_NUMBER], ByteArray[MB_TCP_REGISTER_NUMBER + 1]));
           ByteArray[5] = 6; //Number of bytes after this one.
           MessageLength = 12;
           client.write((const uint8_t *)ByteArray, MessageLength);
-          client.stop();
           node.clearTransmitBuffer(); // Clear the response buffer
           byteFN = MB_FC_NONE;
         }
@@ -287,6 +337,8 @@ void loop()
 
       case MB_FC_WRITE_MULTIPLE_REGISTERS:    //16 Write Multiple Registers
         {
+          node.slaveID(UID);
+
           ByteDataLength = WordDataLength * 2;
           ByteArray[5] = ByteDataLength + 3; //Number of bytes after this one.
           for (int i = 0; i < WordDataLength; i++)
@@ -295,7 +347,6 @@ void loop()
           }
           MessageLength = 12;
           client.write((const uint8_t *)ByteArray, MessageLength);
-          client.stop();
           node.clearTransmitBuffer(); // Clear the response buffer
           byteFN = MB_FC_NONE;
         }
@@ -305,7 +356,4 @@ void loop()
 
   }
   client.stop();
-  if (flagClientConnected == 1) {
-    flagClientConnected = 0;
-  }
 }
