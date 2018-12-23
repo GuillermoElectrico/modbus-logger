@@ -1,7 +1,7 @@
 PAR BCI 10 :
  - 4 # Adress dec data
  - 1 # Length word
- - 3 # Data Type. 1=Float, 2=Long, 3=Integer
+ - 3 # Data Type. 1=Float(ABCD), 2=Long(ABCD), 3=Integer, 4=Long(CDAB)
 PAR BCI 11 :
  - 5
  - 1

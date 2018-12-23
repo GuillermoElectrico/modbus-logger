@@ -71,9 +71,13 @@ class DataCollector:
 
         datas = dict()
         device_id_name = dict() # mapping id to name
+        device_slave_id = dict() # mapping list to id
+        list = 0
 
         for device in devices:
-            device_id_name[device['id']] = device['name']
+            list = list + 1
+            device_id_name[list] = meter['name']
+            device_slave_id[list] = meter['id']
 			
             try:
                 if device['conexion'] == 'R':
@@ -84,10 +88,10 @@ class DataCollector:
                     masterRTU.set_timeout(device['timeout'])
                     masterRTU.set_verbose(True)
 
-                    log.debug('Reading device %s.' % (device['id']))
+                    log.debug('Reading device %s.' % (device['name']))
                     start_time = time.time()
                     parameters = yaml.load(open(device['type']))
-                    datas[device['id']] = dict()
+                    datas[list] = dict()
 
                     for parameter in parameters:
                         # If random readout errors occour, e.g. CRC check fail, test to uncomment the following row
@@ -110,7 +114,11 @@ class DataCollector:
                                         resultado = masterRTU.execute(device['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>l')
                                     elif parameters[parameter][2] == 3:
                                         resultado = masterRTU.execute(device['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1])
-                                datas[device['id']][parameter] = resultado[0]
+                                    elif parameters[parameter][2] == 4:
+                                        resultadoTemp = masterRTU.execute(meter['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1])
+                                        resultado = [0,0]
+                                        resultado[0] = (resultadoTemp[1]<<16)|resultadoTemp[0]
+                                datas[list][parameter] = resultado[0]
                                 retries = 0
                                 pass
                             except ValueError as ve:
@@ -135,16 +143,16 @@ class DataCollector:
                                 log.error("Unexpected error:", sys.exc_info()[0])
                                 raise
 
-                    datas[device['id']]['ReadTime'] =  time.time() - start_time
+                    datas[list]['ReadTime'] =  time.time() - start_time
                 elif device['conexion'] == 'T':
-                    masterTCP = modbus_tcp.TcpMaster(device['direction'],device['port'])
+                    masterTCP = modbus_tcp.TcpMaster(host=meter['direction'],port=meter['port'])
 					
                     masterTCP.set_timeout(device['timeout'])
 
-                    log.debug('Reading device %s.' % (device['id']))
+                    log.debug('Reading device %s.' % (device['name']))
                     start_time = time.time()
                     parameters = yaml.load(open(device['type']))
-                    datas[device['id']] = dict()
+                    datas[list] = dict()
 
                     for parameter in parameters:
                         # If random readout errors occour, e.g. CRC check fail, test to uncomment the following row
@@ -167,7 +175,11 @@ class DataCollector:
                                         resultado = masterTCP.execute(device['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>l')
                                     elif parameters[parameter][2] == 3:
                                         resultado = masterTCP.execute(device['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1])
-                                datas[device['id']][parameter] = resultado[0]
+                                    elif parameters[parameter][2] == 4:
+                                        resultadoTemp = masterTCP.execute(meter['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1])
+                                        resultado = [0,0]
+                                        resultado[0] = (resultadoTemp[1]<<16)|resultadoTemp[0]
+                                datas[list][parameter] = resultado[0]
                                 retries = 0
                                 pass
                             except ValueError as ve:
@@ -192,7 +204,7 @@ class DataCollector:
                                 log.error("Unexpected error:", sys.exc_info()[0])
                                 raise
 
-                    datas[device['id']]['ReadTime'] =  time.time() - start_time
+                    datas[list]['ReadTime'] =  time.time() - start_time
 			
             except modbus_tk.modbus.ModbusError as exc:
                 log.error("%s- Code=%d", exc, exc.get_exception_code())
@@ -201,8 +213,8 @@ class DataCollector:
             {
                 'measurement': 'ModbusLog',
                 'tags': {
-                    'id': device_id,
-                    'device': device['name'],
+                    'id': device_slave_id[device_id],
+                    'meter': device_id_name[device_id],
                 },
                 'time': t_str,
                 'fields': datas[device_id]
@@ -211,6 +223,8 @@ class DataCollector:
         ]
         if len(json_body) > 0:
             influx_id_name = dict() # mapping host to name
+			
+            log.debug(json_body)
 			
             for influx_config in influxdb:
                 influx_id_name[influx_config['host']] = influx_config['name']
