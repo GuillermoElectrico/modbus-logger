@@ -41,7 +41,7 @@ class DataCollector:
         if path.getmtime(self.device_yaml) != self.device_map_last_change:
             try:
                 log.info('Reloading device map as file changed')
-                new_map = yaml.load(open(self.device_yaml))
+                new_map = yaml.load(open(self.device_yaml), Loader=yaml.FullLoader)
                 self.device_map = new_map['devices']
                 self.device_map_last_change = path.getmtime(self.device_yaml)
             except Exception as e:
@@ -54,7 +54,7 @@ class DataCollector:
         if path.getmtime(self.influx_yaml) != self.influx_map_last_change:
             try:
                 log.info('Reloading influxDB map as file changed')
-                new_map = yaml.load(open(self.influx_yaml))
+                new_map = yaml.load(open(self.influx_yaml), Loader=yaml.FullLoader)
                 self.influx_map = new_map['influxdb']
                 self.influx_map_last_change = path.getmtime(self.influx_yaml)
             except Exception as e:
@@ -90,7 +90,7 @@ class DataCollector:
 
                     log.debug('Reading device %s.' % (device['name']))
                     start_time = time.time()
-                    parameters = yaml.load(open(device['type']))
+                    parameters = yaml.load(open(device['type']), Loader=yaml.FullLoader)
                     datas[list] = dict()
 
                     for parameter in parameters:
@@ -151,7 +151,7 @@ class DataCollector:
 
                     log.debug('Reading device %s.' % (device['name']))
                     start_time = time.time()
-                    parameters = yaml.load(open(device['type']))
+                    parameters = yaml.load(open(device['type']), Loader=yaml.FullLoader)
                     datas[list] = dict()
 
                     for parameter in parameters:
