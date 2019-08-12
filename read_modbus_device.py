@@ -21,7 +21,7 @@ PORT = '/dev/ttyUSB0'
 os.chdir(sys.path[0])
 
 class DataCollector:
-    def __init__(self, influx_client, device_yaml):
+    def __init__(self, influx_yaml, device_yaml):
         self.influx_yaml = influx_yaml
         self.influx_map = None
         self.influx_map_last_change = -1
@@ -76,8 +76,8 @@ class DataCollector:
 
         for device in devices:
             list = list + 1
-            device_id_name[list] = meter['name']
-            device_slave_id[list] = meter['id']
+            device_id_name[list] = device['name']
+            device_slave_id[list] = device['id']
 			
             try:
                 if device['conexion'] == 'R':
@@ -296,14 +296,6 @@ if __name__ == '__main__':
     log.addHandler(loghandle)
 
     log.info('Started app')
-
-    # Create the InfluxDB object
-#    influx_config = yaml.load(open('influx_config.yml'))
-#    client = InfluxDBClient(influx_config['host'],
-#                            influx_config['port'],
-#                            influx_config['user'],
-#                            influx_config['password'],
-#                            influx_config['dbname'])
 
     collector = DataCollector(influx_yaml=args.influxdb,
                               device_yaml=args.devices)
