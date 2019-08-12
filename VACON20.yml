@@ -1,0 +1,40 @@
+Frecuencia Salida :
+ - 0 # Adress dec data
+ - 1 # Length word
+ - 3 # Data Type. 1=Float(ABCD), 2=Long(ABCD), 3=Integer, 4=Long(CDAB)
+Intensidad Motor :
+ - 2
+ - 1
+ - 3
+Tension del Motor :
+ - 5
+ - 1
+ - 3
+Tensión del BUS CC :
+ - 6
+ - 1
+ - 3
+Temperatura del convertidor :
+ - 7
+ - 1
+ - 3
+Potencia de salida : 
+ - 78
+ - 1
+ - 3
+DIN1-DIN2-DIN3 :
+ - 14
+ - 1
+ - 3
+DIN4-DIN5-DIN6 :
+ - 15
+ - 1
+ - 3
+RO1-RO2-DO :
+ - 16
+ - 1
+ - 3
+Valor actual de presion :
+ - 1615
+ - 1
+ - 3

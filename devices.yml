@@ -20,7 +20,7 @@ devices:
       timeout  : 0.5   # seconds
       function : 3    # 3 = Read Holding register or 4 = Read Input register 
     - name : Meter Group 3
-      type : ACS310.yml
+      type : VACON20.yml
       conexion: T  # R = RTU 232/485 | T = TCP IPv4
       id : 1     # this is the slave address number
       direction : 192.168.0.123   # IPv4 destination address
