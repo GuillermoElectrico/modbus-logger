@@ -1,7 +1,7 @@
 Frecuencia Salida :
  - 0 # Adress dec data
  - 1 # Length word
- - 3 # Data Type. 1=Float(ABCD), 2=Long(ABCD), 3=Integer, 4=Long(CDAB), 5=Word (Unsigned Int), 6=Dword (Unsigned Long)
+ - 3 # Data Type. 1=Float(ABCD), 2=Long(ABCD), 3=Integer, 4=Long(CDAB), 5=Word (Unsigned Int), 6=Dword (Unsigned Long), 7=Float(CDAB)* 
 Intensidad Motor :
  - 2
  - 1

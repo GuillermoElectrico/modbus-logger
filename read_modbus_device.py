@@ -13,6 +13,7 @@ import modbus_tk
 import modbus_tk.defines as cst
 from modbus_tk import modbus_rtu
 from modbus_tk import modbus_tcp
+import struct
 
 #PORT = 1
 PORT = '/dev/ttyUSB0'
@@ -121,6 +122,11 @@ class DataCollector:
                                         resultado = masterRTU.execute(meter['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>I')
                                     elif parameters[parameter][2] == 6:
                                         resultado = masterRTU.execute(meter['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>L')
+                                    elif parameters[parameter][2] == 7:
+                                        resultadoTemp = masterRTU.execute(meter['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1])
+                                        resultadoTemp2 = (resultadoTemp[1]<<16)|resultadoTemp[0]
+                                        resultado = [0,0]
+                                        resultado[0] = struct.unpack('f', struct.pack('I', resultadoTemp2))[0]
                                 elif meter['function'] == 4:
                                     if parameters[parameter][2] == 1:
                                         resultado = masterRTU.execute(meter['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>f')
@@ -136,6 +142,11 @@ class DataCollector:
                                         resultado = masterRTU.execute(meter['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>I')
                                     elif parameters[parameter][2] == 6:
                                         resultado = masterRTU.execute(meter['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>L')
+                                    elif parameters[parameter][2] == 7:
+                                        resultadoTemp = masterRTU.execute(meter['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1])
+                                        resultadoTemp2 = (resultadoTemp[1]<<16)|resultadoTemp[0]
+                                        resultado = [0,0]
+                                        resultado[0] = struct.unpack('f', struct.pack('I', resultadoTemp2))[0]
                                 datas[list][parameter] = resultado[0]
                                 retries = 0
                                 pass
@@ -194,6 +205,11 @@ class DataCollector:
                                         resultado = masterTCP.execute(meter['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>I')
                                     elif parameters[parameter][2] == 6:
                                         resultado = masterTCP.execute(meter['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>L')
+                                    elif parameters[parameter][2] == 7:
+                                        resultadoTemp = masterTCP.execute(meter['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1])
+                                        resultadoTemp2 = (resultadoTemp[1]<<16)|resultadoTemp[0]
+                                        resultado = [0,0]
+                                        resultado[0] = struct.unpack('f', struct.pack('I', resultadoTemp2))[0]
                                 elif meter['function'] == 4:
                                     if parameters[parameter][2] == 1:
                                         resultado = masterTCP.execute(meter['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>f')
@@ -209,6 +225,11 @@ class DataCollector:
                                         resultado = masterTCP.execute(meter['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>I')
                                     elif parameters[parameter][2] == 6:
                                         resultado = masterTCP.execute(meter['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>L')
+                                    elif parameters[parameter][2] == 7:
+                                        resultadoTemp = masterTCP.execute(meter['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1])
+                                        resultadoTemp2 = (resultadoTemp[1]<<16)|resultadoTemp[0]
+                                        resultado = [0,0]
+                                        resultado[0] = struct.unpack('f', struct.pack('I', resultadoTemp2))[0]
                                 datas[list][parameter] = resultado[0]
                                 retries = 0
                                 pass
