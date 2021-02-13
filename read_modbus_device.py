@@ -16,6 +16,7 @@ from modbus_tk import modbus_tcp
 
 #PORT = 1
 PORT = '/dev/ttyUSB0'
+#PORT = '/dev/serial/by-id/usb-1a86_USB2.0-Serial-if00-port0'
 
 # Change working dir to the same dir as this script
 os.chdir(sys.path[0])
@@ -25,6 +26,7 @@ class DataCollector:
         self.influx_yaml = influx_yaml
         self.influx_map = None
         self.influx_map_last_change = -1
+        self.influx_inteval_save = dict()
         log.info('InfluxDB:')
         for influx_config in sorted(self.get_influxdb(), key=lambda x:sorted(x.keys())):
             log.info('\t {} <--> {}'.format(influx_config['host'], influx_config['name']))
@@ -57,6 +59,10 @@ class DataCollector:
                 new_map = yaml.load(open(self.influx_yaml), Loader=yaml.FullLoader)
                 self.influx_map = new_map['influxdb']
                 self.influx_map_last_change = path.getmtime(self.influx_yaml)
+                list = 0
+                for influx_config in sorted(self.get_influxdb(), key=lambda x:sorted(x.keys())):
+                    list = list + 1
+                    self.influx_inteval_save[list] = influx_config['interval']
             except Exception as e:
                 log.warning('Failed to re-load influxDB map, going on with the old one.')
                 log.warning(e)
@@ -100,24 +106,36 @@ class DataCollector:
                         while retries > 0:
                             try:
                                 retries -= 1
-                                if device['function'] == 3:
+                                if meter['function'] == 3:
                                     if parameters[parameter][2] == 1:
-                                        resultado = masterRTU.execute(device['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>f')
+                                        resultado = masterRTU.execute(meter['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>f')
                                     elif parameters[parameter][2] == 2:
-                                        resultado = masterRTU.execute(device['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>l')
+                                        resultado = masterRTU.execute(meter['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>l')
                                     elif parameters[parameter][2] == 3:
-                                        resultado = masterRTU.execute(device['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1])
-                                elif device['function'] == 4:
+                                        resultado = masterRTU.execute(meter['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1])
+                                    elif parameters[parameter][2] == 4:
+                                        resultadoTemp = masterRTU.execute(meter['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1])
+                                        resultado = [0,0]
+                                        resultado[0] = (resultadoTemp[1]<<16)|resultadoTemp[0]
+                                    elif parameters[parameter][2] == 5:
+                                        resultado = masterRTU.execute(meter['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>I')
+                                    elif parameters[parameter][2] == 6:
+                                        resultado = masterRTU.execute(meter['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>L')
+                                elif meter['function'] == 4:
                                     if parameters[parameter][2] == 1:
-                                        resultado = masterRTU.execute(device['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>f')
+                                        resultado = masterRTU.execute(meter['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>f')
                                     elif parameters[parameter][2] == 2:
-                                        resultado = masterRTU.execute(device['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>l')
+                                        resultado = masterRTU.execute(meter['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>l')
                                     elif parameters[parameter][2] == 3:
-                                        resultado = masterRTU.execute(device['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1])
+                                        resultado = masterRTU.execute(meter['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1])
                                     elif parameters[parameter][2] == 4:
                                         resultadoTemp = masterRTU.execute(meter['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1])
                                         resultado = [0,0]
                                         resultado[0] = (resultadoTemp[1]<<16)|resultadoTemp[0]
+                                    elif parameters[parameter][2] == 5:
+                                        resultado = masterRTU.execute(meter['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>I')
+                                    elif parameters[parameter][2] == 6:
+                                        resultado = masterRTU.execute(meter['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>L')
                                 datas[list][parameter] = resultado[0]
                                 retries = 0
                                 pass
@@ -161,24 +179,36 @@ class DataCollector:
                         while retries > 0:
                             try:
                                 retries -= 1
-                                if device['function'] == 3:
+                                if meter['function'] == 3:
                                     if parameters[parameter][2] == 1:
-                                        resultado = masterTCP.execute(device['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>f')
+                                        resultado = masterTCP.execute(meter['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>f')
                                     elif parameters[parameter][2] == 2:
-                                        resultado = masterTCP.execute(device['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>l')
+                                        resultado = masterTCP.execute(meter['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>l')
                                     elif parameters[parameter][2] == 3:
-                                        resultado = masterTCP.execute(device['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1])
-                                elif device['function'] == 4:
+                                        resultado = masterTCP.execute(meter['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1])
+                                    elif parameters[parameter][2] == 4:
+                                        resultadoTemp = masterTCP.execute(meter['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1])
+                                        resultado = [0,0]
+                                        resultado[0] = (resultadoTemp[1]<<16)|resultadoTemp[0]
+                                    elif parameters[parameter][2] == 5:
+                                        resultado = masterTCP.execute(meter['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>I')
+                                    elif parameters[parameter][2] == 6:
+                                        resultado = masterTCP.execute(meter['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>L')
+                                elif meter['function'] == 4:
                                     if parameters[parameter][2] == 1:
-                                        resultado = masterTCP.execute(device['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>f')
+                                        resultado = masterTCP.execute(meter['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>f')
                                     elif parameters[parameter][2] == 2:
-                                        resultado = masterTCP.execute(device['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>l')
+                                        resultado = masterTCP.execute(meter['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>l')
                                     elif parameters[parameter][2] == 3:
-                                        resultado = masterTCP.execute(device['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1])
+                                        resultado = masterTCP.execute(meter['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1])
                                     elif parameters[parameter][2] == 4:
                                         resultadoTemp = masterTCP.execute(meter['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1])
                                         resultado = [0,0]
                                         resultado[0] = (resultadoTemp[1]<<16)|resultadoTemp[0]
+                                    elif parameters[parameter][2] == 5:
+                                        resultado = masterTCP.execute(meter['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>I')
+                                    elif parameters[parameter][2] == 6:
+                                        resultado = masterTCP.execute(meter['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>L')
                                 datas[list][parameter] = resultado[0]
                                 retries = 0
                                 pass
@@ -205,7 +235,7 @@ class DataCollector:
                                 raise
 
                     datas[list]['ReadTime'] =  time.time() - start_time
-			
+
             except modbus_tk.modbus.ModbusError as exc:
                 log.error("%s- Code=%d", exc, exc.get_exception_code())
 
@@ -222,25 +252,31 @@ class DataCollector:
             for device_id in datas
         ]
         if len(json_body) > 0:
-            influx_id_name = dict() # mapping host to name
-			
-            log.debug(json_body)
-			
+
+#            log.debug(json_body)
+
+            list = 0
+
             for influx_config in influxdb:
-                influx_id_name[influx_config['host']] = influx_config['name']
-				
-                DBclient = InfluxDBClient(influx_config['host'],
-                                        influx_config['port'],
-                                        influx_config['user'],
-                                        influx_config['password'],
-                                        influx_config['dbname'])
-                try:
-                    DBclient.write_points(json_body)
-                    log.info(t_str + ' Data written for %d devices in {}.' .format(influx_config['name']) % len(json_body) )
-                except Exception as e:
-                    log.error('Data not written! in {}' .format(influx_config['name']))
-                    log.error(e)
-                    raise
+                list = list + 1
+                if self.influx_inteval_save[list] > 0:
+                    if self.influx_inteval_save[list] <= 1:
+                        self.influx_inteval_save[list] = influx_config['interval']
+
+                        DBclient = InfluxDBClient(influx_config['host'],
+                                                influx_config['port'],
+                                                influx_config['user'],
+                                                influx_config['password'],
+                                                influx_config['dbname'])
+                        try:
+                            DBclient.write_points(json_body)
+                            log.info(t_str + ' Data written for %d meters in {}.' .format(influx_config['name']) % len(json_body) )
+                        except Exception as e:
+                            log.error('Data not written! in {}' .format(influx_config['name']))
+                            log.error(e)
+                            raise
+                    else:
+                        self.influx_inteval_save[list] = self.influx_inteval_save[list] - 1
         else:
             log.warning(t_str, 'No data sent.')
 
@@ -283,7 +319,7 @@ if __name__ == '__main__':
     logfile = args.logfile
 
     # Setup logging
-    log = logging.getLogger('energy-logger')
+    log = logging.getLogger('modbus-logger')
     log.setLevel(getattr(logging, loglevel))
 
     if logfile:
