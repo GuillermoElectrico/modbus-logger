@@ -31,7 +31,7 @@ Add support for ModbusTCP and add bridge RTU to TCP vía ESP8266 and multi Influ
     ```sh
     $ curl -sL https://repos.influxdata.com/influxdb.key | sudo apt-key add -
     $ source /etc/os-release
-    $ test $VERSION_ID = "9" && echo "deb https://repos.influxdata.com/debian stretch stable" | sudo tee /etc/apt/sources.list.d/influxdb.list
+    $ test $VERSION_ID = "11" && echo "deb https://repos.influxdata.com/debian bullseye stable" | sudo tee /etc/apt/sources.list.d/influxdb.list
     ```
 * Download and install
     ```sh
@@ -47,7 +47,7 @@ Add support for ModbusTCP and add bridge RTU to TCP vía ESP8266 and multi Influ
     CREATE DATABASE db_modbus
     exit
     ```
-[*source](https://docs.influxdata.com/influxdb/v1.3/introduction/installation/)
+[*source](https://docs.influxdata.com/influxdb/v1.8/introduction/installation/)
 
 #### Install Grafana*
 
