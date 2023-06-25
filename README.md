@@ -18,7 +18,7 @@ Add support for ModbusTCP and add bridge RTU to TCP vía ESP8266 and multi Influ
 * Python 3.4 and PIP3
 * PyYAML 5.1 (pip3 install -U PyYAML if installed)
 * [modbus_tk](https://github.com/ljean/modbus-tk)
-* [InfluxDB](https://docs.influxdata.com/influxdb/v1.3/)
+* [InfluxDB](https://docs.influxdata.com/influxdb/v2.7/)
 * [Grafana](http://docs.grafana.org/)
 
 ### Prerequisite
@@ -52,7 +52,7 @@ Add support for ModbusTCP and add bridge RTU to TCP vía ESP8266 and multi Influ
     ```
     or user webui at `http://localhost:8086`
 
-[*source](https://docs.influxdata.com/influxdb/v1.8/introduction/installation/)
+[*manual installation without apt](https://docs.influxdata.com/influxdb/v2.7/install/)
 
 #### Install Grafana*
 
