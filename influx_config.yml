@@ -1,7 +1,8 @@
 influxdb:
     - name : Local InfluxDB 
-      url : 'http://localhost:8086'
-      token: 'WW91ciBiYXNlNjQgZW5jb2RlZCB0b2tlbiBnb2VzIGhlcmUu' #Your base64 encoded token goes here.
-      org: 'myorg'
-      dbname : 'db_modbus' #keep in mind that dbname will be db_modbus/autogen after upgrading form 1.8 to 2.x
+      host : 'localhost'
+      port : 8086
+      user : 'root'
+      password : 'root'
+      dbname : 'db_modbus'
       interval : 1

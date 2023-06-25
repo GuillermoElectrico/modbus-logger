@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
-from influxdb_client import InfluxDBClient
-from influxdb_client.client.write_api import SYNCHRONOUS
+from influxdb import InfluxDBClient
 from datetime import datetime, timedelta
 from os import path
 import sys
@@ -31,7 +30,7 @@ class DataCollector:
         self.influx_inteval_save = dict()
         log.info('InfluxDB:')
         for influx_config in sorted(self.get_influxdb(), key=lambda x:sorted(x.keys())):
-            log.info('\t {} <--> {}'.format(influx_config['url'], influx_config['name']))
+            log.info('\t {} <--> {}'.format(influx_config['host'], influx_config['name']))
         self.device_yaml = device_yaml
         self.max_iterations = None  # run indefinitely by default
         self.device_map = None
@@ -103,7 +102,7 @@ class DataCollector:
 
                     for parameter in parameters:
                         # If random readout errors occour, e.g. CRC check fail, test to uncomment the following row
-                        #time.sleep(0.5) # Sleep for 500 ms between each parameter read to avoid errors
+                        time.sleep(0.5) # Sleep for 500 ms between each parameter read to avoid errors
                         retries = 10
                         while retries > 0:
                             try:
@@ -281,10 +280,13 @@ class DataCollector:
                     if self.influx_inteval_save[list] <= 1:
                         self.influx_inteval_save[list] = influx_config['interval']
 
-                        DBclient = InfluxDBClient(url=influx_config['url'], token=influx_config['token'], org=influx_config['org'])
-                        write_api = DBclient.write_api(write_options=SYNCHRONOUS)
+                        DBclient = InfluxDBClient(influx_config['host'],
+                                                influx_config['port'],
+                                                influx_config['user'],
+                                                influx_config['password'],
+                                                influx_config['dbname'])
                         try:
-                            write_api.write(bucket=influx_config['dbname'],org=influx_config['org'],record=json_body)
+                            DBclient.write_points(json_body)
                             log.info(t_str + ' Data written for %d meters in {}.' .format(influx_config['name']) % len(json_body) )
                         except Exception as e:
                             log.error('Data not written! in {}' .format(influx_config['name']))
