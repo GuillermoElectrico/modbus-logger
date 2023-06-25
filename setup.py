@@ -18,7 +18,7 @@ setup(name='modbus_logger',
         'Programming Language :: Python :: 3.5'
       ],
       keywords='Logger RS485 Modbus',
-      install_requires=[]+(['setuptools','ez_setup','pyserial','modbus_tk', 'influxdb', 'pyyaml'] if "linux" in sys.platform else []),
+      install_requires=[]+(['setuptools','ez_setup','pyserial','modbus_tk', 'influxdb-client', 'pyyaml'] if "linux" in sys.platform else []),
       license='MIT',
       packages=[],
       include_package_data=True,
