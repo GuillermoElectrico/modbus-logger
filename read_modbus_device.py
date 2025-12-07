@@ -15,344 +15,208 @@ from modbus_tk import modbus_rtu
 from modbus_tk import modbus_tcp
 import struct
 
-#PORT = 1
-PORT = '/dev/ttyUSB0'
-#PORT = '/dev/serial/by-id/usb-1a86_USB2.0-Serial-if00-port0'
+PORT = 'COM3'          # ← change to your real port if needed    , thanks to platini2 for all update
+# PORT = '/dev/ttyUSB0'
 
-# Change working dir to the same dir as this script
 os.chdir(sys.path[0])
+
+log = logging.getLogger('modbus-logger')
 
 class DataCollector:
     def __init__(self, influx_yaml, device_yaml):
         self.influx_yaml = influx_yaml
         self.influx_map = None
         self.influx_map_last_change = -1
-        self.influx_inteval_save = dict()
-        log.info('InfluxDB:')
-        for influx_config in sorted(self.get_influxdb(), key=lambda x:sorted(x.keys())):
-            log.info('\t {} <--> {}'.format(influx_config['host'], influx_config['name']))
+        self.influx_interval_save = {}
         self.device_yaml = device_yaml
-        self.max_iterations = None  # run indefinitely by default
         self.device_map = None
         self.device_map_last_change = -1
-        log.info('Devices:')
-        for device in sorted(self.get_devices(), key=lambda x:sorted(x.keys())):
-            log.info('\t {} <--> {}'.format( device['id'], device['name']))
+
+        log.info('InfluxDB configurations:')
+        for cfg in self.get_influxdb():
+            log.info(f"  • {cfg['name']} → {cfg['host']} (every {cfg['interval']} cycles)")
+
+        log.info('devices:')
+        for m in self.get_devices():
+            log.info(f"  • ID {m['id']:>3} → {m['name']} ({'TCP' if m.get('conexion')=='T' else 'RTU'})")
 
     def get_devices(self):
-        assert path.exists(self.device_yaml), 'Device map not found: %s' % self.device_yaml
+        if not path.exists(self.device_yaml):
+            log.error(f'device file not found: {self.device_yaml}')
+            sys.exit(1)
         if path.getmtime(self.device_yaml) != self.device_map_last_change:
-            try:
-                log.info('Reloading device map as file changed')
-                new_map = yaml.load(open(self.device_yaml), Loader=yaml.FullLoader)
-                self.device_map = new_map['devices']
+            with open(self.device_yaml) as f:
+                self.device_map = yaml.load(f, Loader=yaml.FullLoader)['devices']
                 self.device_map_last_change = path.getmtime(self.device_yaml)
-            except Exception as e:
-                log.warning('Failed to re-load device map, going on with the old one.')
-                log.warning(e)
+                log.info('device map reloaded')
         return self.device_map
-		
+
     def get_influxdb(self):
-        assert path.exists(self.influx_yaml), 'InfluxDB map not found: %s' % self.influx_yaml
+        if not path.exists(self.influx_yaml):
+            log.error(f'Influx config not found: {self.influx_yaml}')
+            sys.exit(1)
         if path.getmtime(self.influx_yaml) != self.influx_map_last_change:
-            try:
-                log.info('Reloading influxDB map as file changed')
-                new_map = yaml.load(open(self.influx_yaml), Loader=yaml.FullLoader)
-                self.influx_map = new_map['influxdb']
+            with open(self.influx_yaml) as f:
+                self.influx_map = yaml.load(f, Loader=yaml.FullLoader)['influxdb']
                 self.influx_map_last_change = path.getmtime(self.influx_yaml)
-                list = 0
-                for influx_config in sorted(self.get_influxdb(), key=lambda x:sorted(x.keys())):
-                    list = list + 1
-                    self.influx_inteval_save[list] = influx_config['interval']
-            except Exception as e:
-                log.warning('Failed to re-load influxDB map, going on with the old one.')
-                log.warning(e)
+                self.influx_interval_save = {i+1: cfg['interval'] for i, cfg in enumerate(self.influx_map)}
+                log.info('InfluxDB config reloaded')
         return self.influx_map
 
-    def collect_and_store(self):
-        #instrument.debug = True
-        devices = self.get_devices()
-        influxdb = self.get_influxdb()
-        t_utc = datetime.utcnow()
-        t_str = t_utc.isoformat() + 'Z'
+    def safe_read_registers(self, master, slave_id, func_code, start_addr, count, dtype):
+        """Read registers safely – returns value or None if device does not answer."""
+        for attempt in range(3):
+            try:
+                raw = master.execute(slave_id, func_code, start_addr, count)
 
-        datas = dict()
-        device_id_name = dict() # mapping id to name
-        device_slave_id = dict() # mapping list to id
-        list = 0
+                if dtype == 1:      # float big-endian
+                    return struct.unpack('>f', struct.pack('>HH', raw[0], raw[1]))[0]
+                if dtype == 2:      # signed 32-bit
+                    return struct.unpack('>l', struct.pack('>HH', raw[0], raw[1]))[0]
+                if dtype == 3:      # raw registers
+                    return raw[0] if len(raw) == 1 else list(raw)
+                if dtype == 4:      # swapped word order 32-bit
+                    return (raw[1] << 16) | raw[0]
+                if dtype == 5:      # unsigned 32-bit
+                    return struct.unpack('>I', struct.pack('>HH', raw[0], raw[1]))[0]
+                if dtype == 6:      # unsigned 64-bit (4 registers)
+                    return struct.unpack('>Q', struct.pack('>HHHH', *raw))[0]   # ← fixed line
+                if dtype == 7:      # float little-endian
+                    return struct.unpack('>f', struct.pack('>HH', (raw[1] << 16) | raw[0]))[0]
+                return raw[0]   # fallback
+            except Exception as e:
+                if attempt == 2:
+                    log.debug(f"device ID {slave_id} addr {start_addr}: {e}")
+                time.sleep(0.08)
+        return None
+
+    def collect_and_store(self):
+        devices = self.get_devices()
+        influx_cfgs = self.get_influxdb()
+        t_utc = datetime.utcnow().isoformat() + 'Z'
+
+        datas = {}
+        device_id_name = {}
+        device_slave_id = {}
+        idx = 0
 
         for device in devices:
-            list = list + 1
-            device_id_name[list] = device['name']
-            device_slave_id[list] = device['id']
-			
+            idx += 1
+            device_id_name[idx] = device['name']
+            device_slave_id[idx] = device['id']
+
             try:
-                if device['conexion'] == 'R':
-                    masterRTU = modbus_rtu.RtuMaster(
-                        serial.Serial(port=PORT, baudrate=device['baudrate'], bytesize=device['bytesize'], parity=device['parity'], stopbits=device['stopbits'], xonxoff=0)
+                # Create master (RTU or TCP)
+                if device.get('conexion') == 'R':
+                    ser = serial.Serial(
+                        port=PORT,
+                        baudrate=device['baudrate'],
+                        bytesize=device['bytesize'],
+                        parity=device['parity'],
+                        stopbits=device['stopbits'],
+                        timeout=1
                     )
-					
-                    masterRTU.set_timeout(device['timeout'])
-                    masterRTU.set_verbose(True)
+                    master = modbus_rtu.RtuMaster(ser)
+                elif device.get('conexion') == 'T':
+                    master = modbus_tcp.TcpMaster(host=device['direction'], port=device.get('port', 502))
+                else:
+                    log.warning(f"Unknown conexion {device.get('conexion')} for {device['name']}")
+                    continue
 
-                    log.debug('Reading device %s.' % (device['name']))
-                    start_time = time.time()
-                    parameters = yaml.load(open(device['type']), Loader=yaml.FullLoader)
-                    datas[list] = dict()
+                master.set_timeout(device.get('timeout', 2.0))
 
-                    for parameter in parameters:
-                        # If random readout errors occour, e.g. CRC check fail, test to uncomment the following row
-                        time.sleep(0.5) # Sleep for 500 ms between each parameter read to avoid errors
-                        retries = 10
-                        while retries > 0:
-                            try:
-                                retries -= 1
-                                if device['function'] == 3:
-                                    if parameters[parameter][2] == 1:
-                                        resultado = masterRTU.execute(device['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>f')
-                                    elif parameters[parameter][2] == 2:
-                                        resultado = masterRTU.execute(device['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>l')
-                                    elif parameters[parameter][2] == 3:
-                                        resultado = masterRTU.execute(device['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1])
-                                    elif parameters[parameter][2] == 4:
-                                        resultadoTemp = masterRTU.execute(device['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1])
-                                        resultado = [0,0]
-                                        resultado[0] = (resultadoTemp[1]<<16)|resultadoTemp[0]
-                                    elif parameters[parameter][2] == 5:
-                                        resultado = masterRTU.execute(device['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>I')
-                                    elif parameters[parameter][2] == 6:
-                                        resultado = masterRTU.execute(device['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>L')
-                                    elif parameters[parameter][2] == 7:
-                                        resultadoTemp = masterRTU.execute(device['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1])
-                                        resultado = [0,0]
-                                        resultado[0] = struct.unpack('f', struct.pack('I', (resultadoTemp[1]<<16)|resultadoTemp[0]))[0]
-                                elif device['function'] == 4:
-                                    if parameters[parameter][2] == 1:
-                                        resultado = masterRTU.execute(device['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>f')
-                                    elif parameters[parameter][2] == 2:
-                                        resultado = masterRTU.execute(device['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>l')
-                                    elif parameters[parameter][2] == 3:
-                                        resultado = masterRTU.execute(device['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1])
-                                    elif parameters[parameter][2] == 4:
-                                        resultadoTemp = masterRTU.execute(device['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1])
-                                        resultado = [0,0]
-                                        resultado[0] = (resultadoTemp[1]<<16)|resultadoTemp[0]
-                                    elif parameters[parameter][2] == 5:
-                                        resultado = masterRTU.execute(device['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>I')
-                                    elif parameters[parameter][2] == 6:
-                                        resultado = masterRTU.execute(device['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>L')
-                                    elif parameters[parameter][2] == 7:
-                                        resultadoTemp = masterRTU.execute(device['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1])
-                                        resultado = [0,0]
-                                        resultado[0] = struct.unpack('f', struct.pack('I', (resultadoTemp[1]<<16)|resultadoTemp[0]))[0]
-                                datas[list][parameter] = resultado[0]
-                                retries = 0
-                                pass
-                            except ValueError as ve:
-                                log.warning('Value Error while reading register {} from device {}. Retries left {}.'
-                                       .format(parameters[parameter], device['id'], retries))
-                                log.error(ve)
-                                if retries == 0:
-                                    raise RuntimeError
-                            except TypeError as te:
-                                log.warning('Type Error while reading register {} from device {}. Retries left {}.'
-                                       .format(parameters[parameter], device['id'], retries))
-                                log.error(te)
-                                if retries == 0:
-                                    raise RuntimeError
-                            except IOError as ie:
-                                log.warning('IO Error while reading register {} from device {}. Retries left {}.'
-                                       .format(parameters[parameter], device['id'], retries))
-                                log.error(ie)
-                                if retries == 0:
-                                    raise RuntimeError
-                            except:
-                                log.error("Unexpected error:", sys.exc_info()[0])
-                                raise
+                log.debug(f"Reading {device['name']} (ID {device['id']})")
+                start_time = time.time()
 
-                    datas[list]['ReadTime'] =  time.time() - start_time
-                elif device['conexion'] == 'T':
-                    masterTCP = modbus_tcp.TcpMaster(host=device['direction'],port=device['port'])
-					
-                    masterTCP.set_timeout(device['timeout'])
+                with open(device['type']) as f:
+                    parameters = yaml.load(f, Loader=yaml.FullLoader)
 
-                    log.debug('Reading device %s.' % (device['name']))
-                    start_time = time.time()
-                    parameters = yaml.load(open(device['type']), Loader=yaml.FullLoader)
-                    datas[list] = dict()
+                datas[idx] = {'ReadTime': 0.0}
+                func_code = cst.READ_HOLDING_REGISTERS if device['function'] == 3 else cst.READ_INPUT_REGISTERS
 
-                    for parameter in parameters:
-                        # If random readout errors occour, e.g. CRC check fail, test to uncomment the following row
-                        #time.sleep(0.01) # Sleep for 10 ms between each parameter read to avoid errors
-                        retries = 10
-                        while retries > 0:
-                            try:
-                                retries -= 1
-                                if device['function'] == 3:
-                                    if parameters[parameter][2] == 1:
-                                        resultado = masterTCP.execute(device['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>f')
-                                    elif parameters[parameter][2] == 2:
-                                        resultado = masterTCP.execute(device['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>l')
-                                    elif parameters[parameter][2] == 3:
-                                        resultado = masterTCP.execute(device['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1])
-                                    elif parameters[parameter][2] == 4:
-                                        resultadoTemp = masterTCP.execute(device['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1])
-                                        resultado = [0,0]
-                                        resultado[0] = (resultadoTemp[1]<<16)|resultadoTemp[0]
-                                    elif parameters[parameter][2] == 5:
-                                        resultado = masterTCP.execute(device['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>I')
-                                    elif parameters[parameter][2] == 6:
-                                        resultado = masterTCP.execute(device['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>L')
-                                    elif parameters[parameter][2] == 7:
-                                        resultadoTemp = masterTCP.execute(device['id'], cst.READ_HOLDING_REGISTERS, parameters[parameter][0], parameters[parameter][1])
-                                        resultado = [0,0]
-                                        resultado[0] = struct.unpack('f', struct.pack('I', (resultadoTemp[1]<<16)|resultadoTemp[0]))[0]
-                                elif device['function'] == 4:
-                                    if parameters[parameter][2] == 1:
-                                        resultado = masterTCP.execute(device['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>f')
-                                    elif parameters[parameter][2] == 2:
-                                        resultado = masterTCP.execute(device['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>l')
-                                    elif parameters[parameter][2] == 3:
-                                        resultado = masterTCP.execute(device['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1])
-                                    elif parameters[parameter][2] == 4:
-                                        resultadoTemp = masterTCP.execute(device['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1])
-                                        resultado = [0,0]
-                                        resultado[0] = (resultadoTemp[1]<<16)|resultadoTemp[0]
-                                    elif parameters[parameter][2] == 5:
-                                        resultado = masterTCP.execute(device['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>I')
-                                    elif parameters[parameter][2] == 6:
-                                        resultado = masterTCP.execute(device['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1], data_format='>L')
-                                    elif parameters[parameter][2] == 7:
-                                        resultadoTemp = masterTCP.execute(device['id'], cst.READ_INPUT_REGISTERS, parameters[parameter][0], parameters[parameter][1])
-                                        resultado = [0,0]
-                                        resultado[0] = struct.unpack('f', struct.pack('I', (resultadoTemp[1]<<16)|resultadoTemp[0]))[0]
-                                datas[list][parameter] = resultado[0]
-                                retries = 0
-                                pass
-                            except ValueError as ve:
-                                log.warning('Value Error while reading register {} from device {}. Retries left {}.'
-                                       .format(parameters[parameter], device['id'], retries))
-                                log.error(ve)
-                                if retries == 0:
-                                    raise RuntimeError
-                            except TypeError as te:
-                                log.warning('Type Error while reading register {} from device {}. Retries left {}.'
-                                       .format(parameters[parameter], device['id'], retries))
-                                log.error(te)
-                                if retries == 0:
-                                    raise RuntimeError
-                            except IOError as ie:
-                                log.warning('IO Error while reading register {} from device {}. Retries left {}.'
-                                       .format(parameters[parameter], device['id'], retries))
-                                log.error(ie)
-                                if retries == 0:
-                                    raise RuntimeError
-                            except:
-                                log.error("Unexpected error:", sys.exc_info()[0])
-                                raise
+                for param_name, param_def in parameters.items():
+                    time.sleep(0.15)
+                    value = self.safe_read_registers(
+                        master, device['id'], func_code,
+                        param_def[0], param_def[1], param_def[2]
+                    )
+                    datas[idx][param_name] = value
 
-                    datas[list]['ReadTime'] =  time.time() - start_time
+                datas[idx]['ReadTime'] = time.time() - start_time
+                master._do_close()
 
-            except modbus_tk.modbus.ModbusError as exc:
-                log.error("%s- Code=%d", exc, exc.get_exception_code())
+            except Exception as e:
+                log.error(f"Failed device {device.get('name','?')} (ID {device['id']}): {e}")
+                
+            
+        # Write to InfluxDB
+        if datas:
+            json_body = [
+                {
+                    "measurement": device_id_name[i],
+                    "tags": {"id": str(device_slave_id[i])},
+                    "time": t_utc,
+                    "fields": {k: float(v) if isinstance(v, (int,float)) and v is not None else 0.0
+                               for k, v in datas[i].items() if k != 'ReadTime'}
+                }
+                for i in datas
+            ]
 
-        json_body = [
-            {
-                'measurement': 'ModbusLog',
-                'tags': {
-                    'id': device_slave_id[device_id],
-                    'meter': device_id_name[device_id],
-                },
-                'time': t_str,
-                'fields': datas[device_id]
-            }
-            for device_id in datas
-        ]
-        if len(json_body) > 0:
+            if json_body:
+                for n, cfg in enumerate(influx_cfgs, 1):
+                    if self.influx_interval_save.get(n, 0) <= 1:
+                        self.influx_interval_save[n] = cfg['interval']
 
-#            log.debug(json_body)
-
-            list = 0
-
-            for influx_config in influxdb:
-                list = list + 1
-                if self.influx_inteval_save[list] > 0:
-                    if self.influx_inteval_save[list] <= 1:
-                        self.influx_inteval_save[list] = influx_config['interval']
-
-                        DBclient = InfluxDBClient(influx_config['host'],
-                                                influx_config['port'],
-                                                influx_config['user'],
-                                                influx_config['password'],
-                                                influx_config['dbname'])
                         try:
+                            DBclient = InfluxDBClient(cfg['host'],
+                                                    cfg['port'],
+                                                    cfg['user'],
+                                                    cfg['password'],
+                                                    cfg['dbname'])
                             DBclient.write_points(json_body)
-                            log.info(t_str + ' Data written for %d meters in {}.' .format(influx_config['name']) % len(json_body) )
+
                         except Exception as e:
-                            log.error('Data not written! in {}' .format(influx_config['name']))
-                            log.error(e)
-                            raise
+                            log.error(f"Influx write error ({cfg['name']}): {e}")
                     else:
-                        self.influx_inteval_save[list] = self.influx_inteval_save[list] - 1
-        else:
-            log.warning(t_str, 'No data sent.')
+                        self.influx_interval_save[n] -= 1
 
 
-def repeat(interval_sec, max_iter, func, *args, **kwargs):
-    from itertools import count
+def repeat(interval_sec, func):
     import time
-    starttime = time.time()
-    for i in count():
-        if interval_sec > 0:
-            time.sleep(interval_sec - ((time.time() - starttime) % interval_sec))
-        if i % 1000 == 0:
-            log.info('Collected %d readouts' % i)
+    next_time = time.time()
+    counter = 0
+    while True:
         try:
-            func(*args, **kwargs)
-        except Exception as ex:
-            log.error(ex)
-        if max_iter and i >= max_iter:
-            return
+            func()
+        except Exception as e:
+            log.exception(f"Unhandled exception: {e}")
+
+        counter += 1
+        if counter % 100 == 0:
+            log.info(f"Ran {counter} cycles")
+
+        next_time += interval_sec
+        sleep_time = next_time - time.time()
+        if sleep_time > 0:
+            time.sleep(sleep_time)
 
 
 if __name__ == '__main__':
-
     import argparse
-
     parser = argparse.ArgumentParser()
-    parser.add_argument('--interval', default=60,
-                        help='Device readout interval (seconds), default 60')
-    parser.add_argument('--devices', default='devices.yml',
-                        help='YAML file containing Device ID, name, type etc. Default "devices.yml"')
-    parser.add_argument('--influxdb', default='influx_config.yml',
-                        help='YAML file containing Influx Host, port, user etc. Default "influx_config.yml"')
-    parser.add_argument('--log', default='CRITICAL',
-                        help='Log levels, DEBUG, INFO, WARNING, ERROR or CRITICAL')
-    parser.add_argument('--logfile', default='',
-                        help='Specify log file, if not specified the log is streamed to console')
+    parser.add_argument('--interval', type=int, default=60)
+    parser.add_argument('--devices', default='devices.yml')
+    parser.add_argument('--influxdb', default='influx_config.yml')
+    parser.add_argument('--log', default='INFO',
+                        choices=['DEBUG','INFO','WARNING','ERROR','CRITICAL'])
+    parser.add_argument('--logfile', default='')
     args = parser.parse_args()
-    interval = int(args.interval)
-    loglevel = args.log.upper()
-    logfile = args.logfile
 
-    # Setup logging
-    log = logging.getLogger('modbus-logger')
-    log.setLevel(getattr(logging, loglevel))
+    log.setLevel(getattr(logging, args.log.upper()))
+    handler = logging.FileHandler(args.logfile) if args.logfile else logging.StreamHandler()
+    handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+    log.addHandler(handler)
 
-    if logfile:
-        loghandle = logging.FileHandler(logfile, 'w')
-        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-        loghandle.setFormatter(formatter)
-    else:
-        loghandle = logging.StreamHandler()
-
-    log.addHandler(loghandle)
-
-    log.info('Started app')
-
-    collector = DataCollector(influx_yaml=args.influxdb,
-                              device_yaml=args.devices)
-
-    repeat(interval,
-           max_iter=collector.max_iterations,
-           func=lambda: collector.collect_and_store())
+    log.info('Modbus logger started')
+    collector = DataCollector(influx_yaml=args.influxdb, device_yaml=args.devices)
+    repeat(interval_sec=args.interval, func=collector.collect_and_store)
