@@ -155,8 +155,9 @@ class DataCollector:
                     "measurement": device_id_name[i],
                     "tags": {"id": str(device_slave_id[i])},
                     "time": t_utc,
-                    "fields": {k: float(v) if isinstance(v, (int,float)) and v is not None else 0.0
-                               for k, v in datas[i].items() if k != 'ReadTime'}
+                    "fields": {k: float(v)
+                              for k, v in datas[i].items()
+                              if k != 'ReadTime' and isinstance(v, (int, float)) and v is not None}
                 }
                 for i in datas
             ]
